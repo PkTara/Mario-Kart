@@ -120,7 +120,11 @@ class AI_Agent:
         
         cv2.imshow("Edge Detection", cv2.Canny(screenshot, 50, 150))
 
+
     def process_screenshot(self, screenshot):
+        self.process_screenshot_blur(screenshot)
+
+    def process_screenshot_canny(self, screenshot):
 
         gaussian_intensity = (11,11)
         screenshot = cv2.GaussianBlur(screenshot, gaussian_intensity, 0)  
@@ -138,7 +142,7 @@ class AI_Agent:
         
         gaussian_intensity = (25,25)
         screenshot = cv2.GaussianBlur(screenshot, gaussian_intensity, 0)  
-        cv2.imshow("Gaussian Blur", screenshot)
+        # cv2.imshow("Gaussian Blur", screenshot)
 
         # screenshot = cv2.bilateralFilter(screenshot, 7, 10, 10)
         # Doesn't work.. Is probably too slow for our usecase, but would be better at preserving edges
@@ -196,8 +200,8 @@ class AI_Agent:
 
         mask1 = cv2.inRange(hsv, lower_red1, upper_red1)
         mask2 = cv2.inRange(hsv, lower_red2, upper_red2)
-        red_mask = cv2.bitwise_or(mask1, mask2)
 
+        red_mask = cv2.bitwise_or(mask1, mask2)
 
         contours, _ = cv2.findContours(red_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
