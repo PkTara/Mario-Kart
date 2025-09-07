@@ -12,6 +12,7 @@ from random import random
 from random import sample
 
 from stable_baselines3 import DQN
+import os
 
 
 class AI_Agent: 
@@ -20,6 +21,7 @@ class AI_Agent:
         "B" : "m",
         "left" : ";",
         "right" : "k",
+        "do nothing" : "4",
         # "up" : "i",
         # "down" : "k",
         # "start" : Key.enter,
@@ -34,8 +36,9 @@ class AI_Agent:
     reward_counter = 0
     print("finished reading maps")
 
+    no_rewards = len([f for f in os.listdir(reward_folder) if f.endswith('.png')])
+    q_table = np.zeros((no_rewards, len(moves_list)))  # stage of the game is the observation, actions are the moves
 
-    q_table = np.zeros((7, 4))
     learning_rate = 0.1
     discount_factor = 0.95
     exploration_rate = 1.0
@@ -45,8 +48,18 @@ class AI_Agent:
         # self.controller = pyx.vController()
         self.controller = Controller()
 
+    def restart(self):
+        self.reward_counter = 0
+        self.controller.press(Key.f7)
+        time.sleep(0.1)
+        self.controller.release(Key.f7)
+
+
     def policy(self):
-        return self.policy_dqn()
+        return self.keymap["do nothing"]
+        self.track_distance(screenshot)
+        # return self.policy_dqn()
+        
 
     def policy_dqn(self):
         if random() < self.exploration_rate:
@@ -59,9 +72,20 @@ class AI_Agent:
 
     def update_q_table(self, state, action, reward, next_state):
         print(state, action, reward, next_state)
+
+        if self.reward_counter + 1 == self.no_rewards:
+            print("Track complete! Resetting...")
+            self.restart()
+            return
+
+        # Bellman equation
         self.q_table[state, action] += self.learning_rate * (reward + self.discount_factor * self.q_table[next_state].max() - self.q_table[state, action])
         self.reward_counter += 1
         self.exploration_rate *= 0.99  # Decay exploration rate
+
+        
+
+
 
     def get_state(self):
         return self.reward_counter  
@@ -78,12 +102,13 @@ class AI_Agent:
         self.controller.release(move)
         self.controller.release(Key.space)
 
+        processed_screenshot = self.process_screenshot(screenshot)
 
 
 
 
-        self.getMinimap(screenshot)
-        reached_goal = self.reachedGoal(screenshot)
+        minimap = self.getMinimap(screenshot)
+        reached_goal = self.reachedGoal(minimap)
         print(f"Reached goal: {reached_goal}")
         if reached_goal:
             discrete_move = self.moves_list.index(move)
@@ -95,6 +120,42 @@ class AI_Agent:
         
         cv2.imshow("Edge Detection", cv2.Canny(screenshot, 50, 150))
 
+    def process_screenshot(self, screenshot):
+
+        gaussian_intensity = (11,11)
+        screenshot = cv2.GaussianBlur(screenshot, gaussian_intensity, 0)  
+        screenshot = cv2.resize(screenshot, (100,100), interpolation=cv2.INTER_NEAREST )
+
+        edges = cv2.Canny(screenshot, 50, 200)
+
+        cv2.imshow("Small Canny", cv2.resize(edges, (700,700), interpolation=cv2.INTER_NEAREST))
+        cv2.moveWindow("Small Canny", 1000, 50)
+
+        return edges
+
+
+    def process_screenshot_blur(self, screenshot):
+        
+        gaussian_intensity = (25,25)
+        screenshot = cv2.GaussianBlur(screenshot, gaussian_intensity, 0)  
+        cv2.imshow("Gaussian Blur", screenshot)
+
+        # screenshot = cv2.bilateralFilter(screenshot, 7, 10, 10)
+        # Doesn't work.. Is probably too slow for our usecase, but would be better at preserving edges
+
+        hsv = cv2.cvtColor(screenshot, cv2.COLOR_BGR2HSV)
+        hue = hsv[:, :, 0] # We only need the hue, to simplify the image further
+        # cv2.imshow("Hue", hue)
+
+        screenshot = cv2.resize(hue, (100, 100), interpolation=cv2.INTER_NEAREST)
+
+        screenshot = cv2.resize(screenshot, (700, 700), interpolation=cv2.INTER_NEAREST)
+        cv2.imshow("Resized Gaussian", screenshot)
+        cv2.moveWindow("Resized Gaussian", 1000,250)
+
+        
+
+        return screenshot
 
     def getMinimap(self, screenshot):
         height, width = screenshot.shape[:2]
@@ -126,22 +187,18 @@ class AI_Agent:
         pass
     
     def findKart(self, minimap):
-        # Convert minimap to HSV color space
         hsv = cv2.cvtColor(minimap, cv2.COLOR_BGR2HSV)
 
-        # Define red color range in HSV
         lower_red1 = np.array([0, 70, 50])
         upper_red1 = np.array([10, 255, 255])
         lower_red2 = np.array([170, 70, 50])
         upper_red2 = np.array([180, 255, 255])
 
-        # Create masks for red color
         mask1 = cv2.inRange(hsv, lower_red1, upper_red1)
         mask2 = cv2.inRange(hsv, lower_red2, upper_red2)
         red_mask = cv2.bitwise_or(mask1, mask2)
 
 
-        # Find contours in the mask
         contours, _ = cv2.findContours(red_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
         if contours:
@@ -158,11 +215,14 @@ class AI_Agent:
         if not kart:
             return False
 
-        reward_map = cv2.imread(self.reward_folder + f"reward {self.reward_counter}.png", cv2.IMREAD_GRAYSCALE)
+        print(f"Reward map: {self.reward_folder + 'reward' +  str(self.reward_counter)}.png")
+        self.reward_map = cv2.imread(self.reward_folder + f"reward {self.reward_counter}.png", cv2.IMREAD_GRAYSCALE)
         reward = cv2.resize(self.reward_map, (minimap.shape[1], minimap.shape[0]), interpolation=cv2.INTER_NEAREST)
         
         collision = reward[kart[1]:kart[1]+kart[3], kart[0]:kart[0]+kart[2]]
         # TODO: make kart an obj
+
+        cv2.imshow('Reward', reward)
 
         
 
