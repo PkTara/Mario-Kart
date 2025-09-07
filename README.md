@@ -9,3 +9,18 @@ Height - 620
 - Take input
 - Take screenshots
 - Get reward via passing marks on minimap
+
+This is planned to become a gymnasium environment.
+Observations: 
+- Processed screenshot
+- Speed (memory read)
+- Time lap (memory read)
+
+Reward:
+- Currently minimap
+
+Reset:
+- Currently when minimap runs out of rewards
+- ideally, memory read if kart goes off road, or wrong direction
+
+
